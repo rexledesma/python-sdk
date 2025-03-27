@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import pytest
 from pydantic import AnyUrl
@@ -9,6 +9,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.prompts.base import EmbeddedResource, Message, UserMessage
 from mcp.server.fastmcp.resources import FileResource, FunctionResource
 from mcp.server.fastmcp.utilities.types import Image
+from mcp.server.session import ServerSession
 from mcp.shared.exceptions import McpError
 from mcp.shared.memory import (
     create_connected_server_and_client_session as client_session,
@@ -475,6 +476,28 @@ class TestContextInjection:
         mcp = FastMCP()
 
         def tool_with_context(x: int, ctx: Context) -> str:
+            return f"Request {ctx.request_id}: {x}"
+
+        tool = mcp._tool_manager.add_tool(tool_with_context)
+        assert tool.context_kwarg == "ctx"
+
+    @pytest.mark.anyio
+    async def test_context_with_type_subscription_detection(self):
+        """Test that subscripted context parameters are properly detected."""
+        mcp = FastMCP()
+
+        def tool_with_context(x: int, ctx: Context[ServerSession, None]) -> str:
+            return f"Request {ctx.request_id}: {x}"
+
+        tool = mcp._tool_manager.add_tool(tool_with_context)
+        assert tool.context_kwarg == "ctx"
+
+    @pytest.mark.anyio
+    async def test_context_with_type_annotation_detection(self):
+        """Test that annotated context parameters are properly detected."""
+        mcp = FastMCP()
+
+        def tool_with_context(x: int, ctx: Annotated[Context, "an annotation"]) -> str:
             return f"Request {ctx.request_id}: {x}"
 
         tool = mcp._tool_manager.add_tool(tool_with_context)
